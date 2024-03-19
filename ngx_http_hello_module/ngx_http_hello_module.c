@@ -64,7 +64,7 @@ static ngx_int_t ngx_http_hello_handler(ngx_http_request_t *r) {
     r->headers_out.content_type.len = sizeof("text/plain") - 1;
     r->headers_out.content_type.data = (u_char *)"text/plain";
     r->headers_out.status = NGX_HTTP_OK;
-    r->headers_out.content_length_n = sizeof("Hello, World!") - 1;
+    r->headers_out.content_length_n = sizeof("Hello, NGINX!") - 1;
 
     rc = ngx_http_send_header(r);
 
@@ -81,8 +81,8 @@ static ngx_int_t ngx_http_hello_handler(ngx_http_request_t *r) {
     out.buf = b;
     out.next = NULL;
 
-    b->pos = (u_char *)"Hello, World!";
-    b->last = b->pos + sizeof("Hello, World!") - 1;
+    b->pos = (u_char *)"Hello, NGINX!";
+    b->last = b->pos + sizeof("Hello, NGINX!") - 1;
     b->memory = 1;
     b->last_buf = 1;
 
