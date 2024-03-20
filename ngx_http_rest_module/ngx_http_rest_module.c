@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include <string.h>
 
+#include "../util/cJSON.h"
+
 #define PING_ENDPOINT "/api/ping"
 #define __match(uri, ep)                                                       \
     !strncmp((const char *)uri, ep, strlen(ep)) ? true : false
@@ -13,6 +15,7 @@ static char *ngx_http_rest(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
 static ngx_int_t ngx_http_rest_handler(ngx_http_request_t *r);
 
 static ngx_int_t dispatch(ngx_http_request_t *r, ngx_chain_t *out);
+static ngx_int_t ping_endpoint_handler(ngx_http_request_t *r, ngx_chain_t *out);
 
 /*
  location /api {
@@ -112,21 +115,14 @@ static ngx_int_t ngx_http_rest_handler(ngx_http_request_t *r) {
     return ngx_http_output_filter(r, &out);
 }
 
-static ngx_int_t set_resp_headers(ngx_http_request_t *r, const char *msg) {
-    ngx_int_t rc;
+static ngx_int_t dispatch(ngx_http_request_t *r, ngx_chain_t *out) {
+    const u_char *uri = r->uri.data;
 
-    r->headers_out.content_type.len = sizeof("text/plain") - 1;
-    r->headers_out.content_type.data = (u_char *)"text/plain";
-    r->headers_out.status = NGX_HTTP_OK;
-    r->headers_out.content_length_n = strlen(msg);
-
-    rc = ngx_http_send_header(r);
-
-    if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
-        return rc;
+    if (__match(uri, PING_ENDPOINT)) {
+        return ping_endpoint_handler(r, out);
     }
 
-    return NGX_OK;
+    return NGX_HTTP_BAD_REQUEST;
 }
 
 static ngx_int_t ping_endpoint_handler(ngx_http_request_t *r,
@@ -136,10 +132,31 @@ static ngx_int_t ping_endpoint_handler(ngx_http_request_t *r,
     ngx_int_t rc;
     ngx_buf_t *b;
 
-    if ((rc = set_resp_headers(r, ping_msg)) != NGX_OK) {
+    // build JSON response
+    cJSON *json = cJSON_CreateObject();
+
+    if (json == NULL)
+        return NGX_HTTP_INTERNAL_SERVER_ERROR;
+
+    cJSON_AddStringToObject(json, "message", ping_msg);
+    cJSON_AddBoolToObject(json, "success", true);
+
+    // stringify object
+    char *json_str = cJSON_Print(json);
+
+    // set headers
+    r->headers_out.content_type.len = sizeof("application/json") - 1;
+    r->headers_out.content_type.data = (u_char *)"application/json";
+    r->headers_out.status = NGX_HTTP_OK;
+    r->headers_out.content_length_n = strlen(json_str);
+
+    rc = ngx_http_send_header(r);
+
+    if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
         return rc;
     }
 
+    // set body
     b = ngx_palloc(r->pool, sizeof(ngx_buf_t));
 
     if (b == NULL) {
@@ -151,20 +168,10 @@ static ngx_int_t ping_endpoint_handler(ngx_http_request_t *r,
     out->buf = b;
     out->next = NULL;
 
-    b->pos = (u_char *)ping_msg;
-    b->last = b->pos + strlen(ping_msg);
+    b->pos = (u_char *)json_str;
+    b->last = b->pos + strlen(json_str);
     b->memory = 1;
     b->last_buf = 1;
 
     return NGX_OK;
-}
-
-static ngx_int_t dispatch(ngx_http_request_t *r, ngx_chain_t *out) {
-    const u_char *uri = r->uri.data;
-
-    if (__match(uri, PING_ENDPOINT)) {
-        return ping_endpoint_handler(r, out);
-    }
-
-    return NGX_HTTP_BAD_REQUEST;
 }
