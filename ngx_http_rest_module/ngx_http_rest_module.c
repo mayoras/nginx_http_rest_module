@@ -142,7 +142,7 @@ static ngx_int_t ping_endpoint_handler(ngx_http_request_t *r,
     cJSON_AddBoolToObject(json, "success", true);
 
     // stringify object
-    char *json_str = cJSON_Print(json);
+    char *json_str = cJSON_PrintUnformatted(json);
 
     // set headers
     r->headers_out.content_type.len = sizeof("application/json") - 1;
